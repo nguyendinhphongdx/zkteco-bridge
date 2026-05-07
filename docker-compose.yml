@@ -1,0 +1,56 @@
+# C-HR ZK-Bridge — standalone deploy on the customer's LAN machine.
+#
+# Usage:
+#   cd services/zk-bridge
+#   docker compose up -d --build
+#   open http://<this-machine-ip>:7000
+#
+# This compose file is INDEPENDENT from the C-HR root compose: bridge does
+# not run alongside the backend. Backend lives in the cloud; bridge lives in
+# the office where it can reach the ZKTeco device.
+
+services:
+  zk-bridge:
+    build: .
+    container_name: zk-bridge
+    image: c-hr/zk-bridge:latest
+    restart: unless-stopped
+
+    # Default: bridge networking — works on Linux / macOS / Windows. The
+    # bridge is reachable on http://<host>:7000. LAN scan still works because
+    # the host's Docker daemon proxies outbound TCP from the container, but
+    # `os.networkInterfaces()` inside the container sees the docker0 bridge
+    # IPs (e.g. 172.17.x.x) rather than the host's LAN IP — meaning the scan
+    # will probe the docker subnet, not the office LAN. For accurate LAN
+    # scan, switch to `network_mode: host` (Linux only) — see below.
+    ports:
+      - '${BRIDGE_PORT:-7000}:7000'
+
+    # On Linux, prefer host networking so the bridge sees the office LAN
+    # subnet directly (LAN scan works correctly + no port mapping). Comment
+    # out `ports:` above and uncomment this on Linux production hosts:
+    # network_mode: host
+
+    # Persist SQLite DB + autostart state on a named volume next to the
+    # compose file. Survives container recreation.
+    volumes:
+      - ./data:/app/data
+
+    environment:
+      DATA_DIR: /app/data
+      PORT: 7000
+      # Inside container we always bind 0.0.0.0 — the host network layer
+      # decides who can reach 7000.
+      BIND_HOST: 0.0.0.0
+      TZ: ${TZ:-Asia/Ho_Chi_Minh}
+
+    # Stop signal so tini forwards it correctly to Node.
+    stop_signal: SIGTERM
+    stop_grace_period: 10s
+
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:7000/login >/dev/null 2>&1 || exit 1']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s

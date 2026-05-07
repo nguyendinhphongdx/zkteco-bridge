@@ -1,0 +1,9 @@
+# Pivot point — stops pnpm from walking up to the C-HR monorepo workspace.
+# This package is intentionally standalone (publishable as its own npm package);
+# the root pnpm-workspace.yaml deliberately does NOT list services/zk-bridge.
+#
+# `packages: ["."]` means: this directory IS the workspace, with itself as
+# the sole member. `pnpm install` here resolves only zk-bridge deps and
+# writes a local pnpm-lock.yaml, never touching apps/* or mcp/*.
+packages:
+  - '.'
