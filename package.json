@@ -1,6 +1,6 @@
 {
   "name": "@hanoilab/zk-bridge",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "private": false,
   "description": "Pull-side bridge for ZKTeco attendance devices — polls over LAN and pushes events to any HTTP backend",
   "keywords": [
