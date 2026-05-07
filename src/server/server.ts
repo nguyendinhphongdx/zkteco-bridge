@@ -37,6 +37,7 @@ import { renderApiConfigPage, renderSystemConfigPage } from './ui/config-pages';
 import { renderDashboard } from './ui/dashboard-page';
 import { renderDeviceEventsPage, type DeviceEventRow } from './ui/device-events-page';
 import { renderDevicesPage } from './ui/devices-page';
+import { renderGuidePage } from './ui/guide-page';
 import { renderLogsPage } from './ui/logs-page';
 
 interface SessionVars {
@@ -484,6 +485,9 @@ export function createServer(): Hono<SessionVars> {
   });
 
   // ---------- /logs ----------
+  // ---------- /guide ----------
+  app.get('/guide', (c) => c.html(renderGuidePage()));
+
   app.get('/logs', async (c) => {
     const pageRaw = Number(c.req.query('page') ?? '1');
     const page = Number.isFinite(pageRaw) && pageRaw >= 1 ? Math.floor(pageRaw) : 1;
