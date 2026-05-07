@@ -1,19 +1,17 @@
-# C-HR ZK-Bridge — standalone deploy on the customer's LAN machine.
+# ZK-Bridge — standalone Docker deploy.
 #
 # Usage:
-#   cd services/zk-bridge
 #   docker compose up -d --build
 #   open http://<this-machine-ip>:7000
 #
-# This compose file is INDEPENDENT from the C-HR root compose: bridge does
-# not run alongside the backend. Backend lives in the cloud; bridge lives in
-# the office where it can reach the ZKTeco device.
+# Run on a host inside the same LAN as the ZKTeco devices. The backend
+# (where events are pushed to) can be anywhere reachable by HTTPS.
 
 services:
   zk-bridge:
     build: .
     container_name: zk-bridge
-    image: c-hr/zk-bridge:latest
+    image: hanoilab/zk-bridge:latest
     restart: unless-stopped
 
     # Default: bridge networking — works on Linux / macOS / Windows. The

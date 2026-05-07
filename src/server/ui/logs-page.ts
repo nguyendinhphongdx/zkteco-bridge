@@ -10,7 +10,7 @@ function statusBadge(status: string): string {
   const classes: Record<string, string> = {
     ok: 'bg-emerald-100 text-emerald-800',
     partial: 'bg-amber-100 text-amber-800',
-    chr_error: 'bg-rose-100 text-rose-800',
+    api_error: 'bg-rose-100 text-rose-800',
     zk_error: 'bg-rose-100 text-rose-800',
   };
   const cls = classes[status] ?? 'bg-slate-100 text-slate-700';

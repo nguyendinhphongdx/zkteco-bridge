@@ -8,7 +8,7 @@ function unitFile(): string {
   const { entry, nodeBin, workDir } = resolveRunPaths();
   const user = process.env.USER || 'root';
   return `[Unit]
-Description=C-HR ZK-Bridge
+Description=ZK-Bridge — ZKTeco attendance bridge
 After=network-online.target
 Wants=network-online.target
 

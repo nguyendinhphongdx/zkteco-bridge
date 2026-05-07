@@ -13,22 +13,21 @@ import {
   type DeviceView,
 } from '../db/repo';
 
-import { pushEventsBatched } from './chr-client';
+import { pushEventsBatched } from './api-client';
 import { translateZkRecord } from './translate';
 import type { AttendanceEvent } from './types';
 import { fetchAttendances } from './zk-client';
 
 // Cap số record gửi mỗi cycle. Bridge không filter cursor — pull bao
-// nhiêu lib trả, take last N (newest), push hết cho C-HR. Server dedup
-// qua unique (deviceId, eventLogId) → push trùng = no-op an toàn.
-// Pattern này match flow cũ với `bulkCreate({ updateOnDuplicate })`:
-// đơn giản, tự healing khi cursor lệch / device reset / partial read.
+// nhiêu lib trả, take last N (newest), push hết. Backend dedup qua unique
+// (deviceId, eventLogId) → push trùng = no-op an toàn. Self-healing khi
+// cursor lệch / device reset / partial read.
 const LIMIT_RECENT_RECORDS = 2000;
 
 export interface DeviceCycleResult {
   deviceId: number;
   deviceName: string;
-  status: 'ok' | 'zk_error' | 'chr_error' | 'partial';
+  status: 'ok' | 'zk_error' | 'api_error' | 'partial';
   pulled: number;
   pushed: number;
   queued: number;
@@ -63,7 +62,7 @@ export async function runCycle(): Promise<CycleSummary> {
   }
 
   for (const device of devices) {
-    const result = await runDeviceCycle(shared.chrApiUrl, device);
+    const result = await runDeviceCycle(shared.pushUrl, shared.pingUrl, device);
     summary.results.push(result);
   }
   await rotateCycleLogs();
@@ -71,7 +70,8 @@ export async function runCycle(): Promise<CycleSummary> {
 }
 
 async function runDeviceCycle(
-  apiUrl: string,
+  pushUrl: string,
+  pingUrl: string | undefined,
   device: DeviceView,
 ): Promise<DeviceCycleResult> {
   console.log(
@@ -88,7 +88,7 @@ async function runDeviceCycle(
     console.log(`[poll] device "${device.name}" — draining ${queued.length} queued event(s)`);
     const events = queued.map((q) => JSON.parse(q.payloadJson) as AttendanceEvent);
     const drainResult = await pushEventsBatched(
-      { baseUrl: apiUrl, token: device.chrDeviceToken },
+      { pushUrl, pingUrl, token: device.deviceToken },
       events,
     );
     const successIds = queued.slice(0, drainResult.success).map((q) => q.id);
@@ -103,14 +103,14 @@ async function runDeviceCycle(
         eventsPolled: 0,
         eventsPushed: pushed,
         eventsQueued: failedIds.length,
-        status: 'chr_error',
+        status: 'api_error',
         errorMessage: msg,
       });
-      await updateDeviceCursor(device.id, { lastStatus: 'chr_error', lastError: msg });
+      await updateDeviceCursor(device.id, { lastStatus: 'api_error', lastError: msg });
       return {
         deviceId: device.id,
         deviceName: device.name,
-        status: 'chr_error',
+        status: 'api_error',
         pulled: 0,
         pushed,
         queued: failedIds.length,
@@ -192,10 +192,10 @@ async function runDeviceCycle(
   }
 
   // 3. Push fresh events (chunked). On partial failure, enqueue the tail and
-  //    still advance cursor — C-HR dedupes by (deviceId, eventLogId) so a
+  //    still advance cursor — backend dedupes by (deviceId, eventLogId) so a
   //    rare double-send is safe; the queue will retry on the next cycle.
   const pushResult = await pushEventsBatched(
-    { baseUrl: apiUrl, token: device.chrDeviceToken },
+    { pushUrl, pingUrl, token: device.deviceToken },
     fresh,
   );
   pushed += pushResult.success;
@@ -233,7 +233,7 @@ async function runDeviceCycle(
       failed.map((e) => JSON.stringify(e)),
     );
     queuedNow = failed.length;
-    const status = pushed > 0 ? 'partial' : 'chr_error';
+    const status = pushed > 0 ? 'partial' : 'api_error';
     await finishCycle(cycleId, {
       eventsPolled: pulled,
       eventsPushed: pushed,

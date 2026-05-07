@@ -1,7 +1,7 @@
 export interface LayoutOptions {
   title: string;
   body: string;
-  active?: 'dashboard' | 'devices' | 'config-chr' | 'config-system' | 'logs' | null;
+  active?: 'dashboard' | 'devices' | 'config-api' | 'config-system' | 'logs' | null;
   showNav?: boolean;
   flash?: { kind: 'ok' | 'err'; message: string } | null;
 }
@@ -31,7 +31,7 @@ export function renderLayout(opts: LayoutOptions): string {
           <span class="font-semibold text-slate-900 mr-4">ZK-Bridge</span>
           ${navLink('/dashboard', 'Dashboard', opts.active === 'dashboard')}
           ${navLink('/devices', 'Devices', opts.active === 'devices')}
-          ${navLink('/config/chr', 'C-HR', opts.active === 'config-chr')}
+          ${navLink('/config/api', 'API', opts.active === 'config-api')}
           ${navLink('/config/system', 'System', opts.active === 'config-system')}
           ${navLink('/logs', 'Logs', opts.active === 'logs')}
           <span class="flex-1"></span>

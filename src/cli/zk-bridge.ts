@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * `zk-bridge` CLI entry — published as the `bin` of @c-hr/zk-bridge so admins
+ * `zk-bridge` CLI entry — published as the `bin` of this package so admins
  * who install the package globally can run `zk-bridge <command>` instead of
  * remembering `node /opt/whatever/dist/index.js`.
  *
@@ -100,7 +100,7 @@ async function upgrade(tag = 'latest'): Promise<void> {
     `[zk-bridge] ✓ upgraded ${target}.\n` +
       'Restart the running bridge process to pick up the new code:\n' +
       '  systemd:        sudo systemctl restart zk-bridge\n' +
-      '  Windows Task:   schtasks /End /TN "C-HR zk-bridge" && schtasks /Run /TN "C-HR zk-bridge"\n' +
+      '  Windows Task:   schtasks /End /TN "ZK-Bridge (zk-bridge)" && schtasks /Run /TN "ZK-Bridge (zk-bridge)"\n' +
       '  launchd:        launchctl kickstart -k gui/$UID/com.chr.zk-bridge\n' +
       '  pm2:            pm2 restart zk-bridge\n' +
       '  docker compose: docker compose pull && docker compose up -d\n' +

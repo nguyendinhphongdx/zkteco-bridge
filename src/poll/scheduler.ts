@@ -26,7 +26,7 @@ async function safeRun(): Promise<void> {
     const summary = await runCycle();
     const ms = Date.now() - start;
     if (summary.apiUrlMissing) {
-      console.log(`[scheduler] cycle skipped (${ms}ms) — C-HR API URL not set`);
+      console.log(`[scheduler] cycle skipped (${ms}ms) — backend Push URL not configured`);
     } else if (summary.noDevices) {
       console.log(`[scheduler] cycle skipped (${ms}ms) — no enabled devices`);
     } else {

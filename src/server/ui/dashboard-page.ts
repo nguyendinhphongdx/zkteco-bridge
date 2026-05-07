@@ -20,7 +20,7 @@ function statusBadge(status: string | null): string {
   const classes: Record<string, string> = {
     ok: 'bg-emerald-100 text-emerald-800',
     partial: 'bg-amber-100 text-amber-800',
-    chr_error: 'bg-rose-100 text-rose-800',
+    api_error: 'bg-rose-100 text-rose-800',
     zk_error: 'bg-rose-100 text-rose-800',
   };
   if (!status) {
@@ -33,19 +33,19 @@ function statusBadge(status: string | null): string {
 export function renderDashboard(data: DashboardData): string {
   const setupBanner = !data.apiUrlSet
     ? `<div class="mb-4 px-4 py-3 rounded bg-amber-50 text-amber-800 border border-amber-200">
-         Set the C-HR API URL in <a class="underline" href="/config/chr">C-HR config</a>, then add a device on
+         Configure the backend Push URL in <a class="underline" href="/config/api">API settings</a>, then add a device on
          <a class="underline" href="/devices">Devices</a>.
        </div>`
     : data.devices.length === 0
       ? `<div class="mb-4 px-4 py-3 rounded bg-amber-50 text-amber-800 border border-amber-200">
-           No devices configured. Add one on the <a class="underline" href="/devices">Devices</a> page.
+           No devices yet. Add one on the <a class="underline" href="/devices">Devices</a> page.
          </div>`
       : '';
 
   const enabledCount = data.devices.filter((d) => d.enabled).length;
   const okCount = data.devices.filter((d) => d.lastStatus === 'ok').length;
   const errCount = data.devices.filter(
-    (d) => d.lastStatus === 'chr_error' || d.lastStatus === 'zk_error',
+    (d) => d.lastStatus === 'api_error' || d.lastStatus === 'zk_error',
   ).length;
 
   const deviceRows =

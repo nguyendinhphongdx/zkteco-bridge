@@ -11,7 +11,7 @@ function statusDot(status: string | null): string {
   const map: Record<string, { color: string; label: string }> = {
     ok: { color: 'bg-emerald-500', label: 'OK' },
     partial: { color: 'bg-amber-500', label: 'Partial' },
-    chr_error: { color: 'bg-rose-500', label: 'C-HR error' },
+    api_error: { color: 'bg-rose-500', label: 'API error' },
     zk_error: { color: 'bg-rose-500', label: 'Device error' },
   };
   const m = status ? map[status] : null;
@@ -121,7 +121,7 @@ export function renderDevicesPage(opts: {
   const apiBanner = opts.apiUrlSet
     ? ''
     : `<div class="mb-4 px-4 py-3 rounded bg-amber-50 text-amber-800 border border-amber-200">
-         Set the C-HR API URL in <a class="underline" href="/config/chr">C-HR config</a> before adding devices.
+         Configure the backend Push URL in <a class="underline" href="/config/api">API settings</a> before adding devices.
        </div>`;
 
   const body = `
@@ -186,9 +186,9 @@ export function renderDevicesPage(opts: {
           </div>
           <hr class="border-slate-200">
           <label class="block">
-            <span class="text-sm font-medium">C-HR Device token</span>
-            <span class="text-xs text-slate-500"> — paste from C-HR <code class="bg-slate-100 px-1 rounded">/settings/attendance-devices</code></span>
-            <textarea name="chrDeviceToken" required rows="3"
+            <span class="text-sm font-medium">Device token</span>
+            <span class="text-xs text-slate-500"> — JWT issued by your backend for this device</span>
+            <textarea name="deviceToken" required rows="3"
               class="mt-1 block w-full border border-slate-300 rounded px-3 py-2 font-mono text-xs break-all outline-none focus:ring-2 focus:ring-slate-500"></textarea>
           </label>
           <label class="flex items-center gap-2">
@@ -216,7 +216,7 @@ export function renderDevicesPage(opts: {
           form.name.value = prefill?.name ?? '';
           form.host.value = prefill?.host ?? '';
           form.port.value = prefill?.port ?? '4370';
-          form.chrDeviceToken.value = '';
+          form.deviceToken.value = '';
           form.enabled.checked = true;
           modal.showModal();
         }
@@ -228,7 +228,7 @@ export function renderDevicesPage(opts: {
           form.name.value = d.name;
           form.host.value = d.host;
           form.port.value = d.port;
-          form.chrDeviceToken.value = d.chrDeviceToken;
+          form.deviceToken.value = d.deviceToken;
           form.enabled.checked = !!d.enabled;
           modal.showModal();
         }

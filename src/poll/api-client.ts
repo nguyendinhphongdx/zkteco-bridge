@@ -2,15 +2,19 @@ import axios, { AxiosError } from 'axios';
 import type { AttendanceEvent, PushAttendanceBody } from './types';
 
 export interface PushClientConfig {
-  baseUrl: string;
+  /** Full URL the bridge POSTs `{ token, events[] }` to. */
+  pushUrl: string;
+  /** Optional full URL for connectivity checks. If absent, `pingConnection`
+   *  falls back to a push with empty events. */
+  pingUrl?: string;
   token: string;
   timeoutMs?: number;
 }
 
 /**
  * Default batch size for `pushEventsBatched`. Chosen so a typical 200-event
- * payload (~50KB) sits well under the NestJS default body-parser limit
- * (100KB) — initial syncs of thousands of events still go through.
+ * payload (~50KB) sits well under the common 100KB body-parser limit on
+ * Node frameworks — initial syncs of thousands of events still go through.
  */
 export const DEFAULT_BATCH_SIZE = 200;
 
@@ -29,7 +33,7 @@ export async function pushEvents(
     token: cfg.token,
     events,
   };
-  const url = `${cfg.baseUrl.replace(/\/$/, '')}/attendance-devices/push`;
+  const url = cfg.pushUrl;
   const start = Date.now();
   try {
     await axios.post(url, body, { timeout: cfg.timeoutMs ?? 30_000 });
@@ -40,14 +44,12 @@ export async function pushEvents(
       const data = err.response?.data;
       const detail = typeof data === 'string' ? data : JSON.stringify(data ?? err.message);
       console.error(
-        `[chr-client] ✗ ${url} HTTP ${status ?? '???'} (${Date.now() - start}ms): ${detail}`,
+        `[api] ✗ ${url} HTTP ${status ?? '???'} (${Date.now() - start}ms): ${detail}`,
       );
-      throw new Error(
-        `C-HR push failed${status ? ` (HTTP ${status})` : ''}: ${detail}`,
-      );
+      throw new Error(`Push failed${status ? ` (HTTP ${status})` : ''}: ${detail}`);
     }
     console.error(
-      `[chr-client] ✗ ${url} (${Date.now() - start}ms):`,
+      `[api] ✗ ${url} (${Date.now() - start}ms):`,
       err instanceof Error ? err.message : err,
     );
     throw err;
@@ -55,41 +57,60 @@ export async function pushEvents(
 }
 
 export interface PingResult {
-  deviceId: string;
-  lastSeenAt: string;
+  deviceId?: string;
+  lastSeenAt?: string;
 }
 
 /**
- * Connectivity check — POST `/attendance-devices/ping` with just the JWT.
- * Server verifies the token and bumps `lastSeenAt`. Returns the resolved
- * deviceId so the bridge can confirm token validity.
+ * Connectivity check. POSTs `{ token }` to `pingUrl` if configured. If no
+ * pingUrl, posts an empty events array to `pushUrl` and treats a 4xx
+ * response that mentions `events` as proof the route + auth are reachable.
+ *
+ * Returns whatever shape the backend echoed (some wrap as
+ * `{ success, data }`); empty object if nothing useful to report.
  */
 export async function pingConnection(cfg: PushClientConfig): Promise<PingResult> {
-  const url = `${cfg.baseUrl.replace(/\/$/, '')}/attendance-devices/ping`;
+  if (cfg.pingUrl) {
+    return postPing(cfg.pingUrl, cfg);
+  }
+  // Fallback: try push with empty array. Backends that validate `events:
+  // ArrayNotEmpty` will respond 4xx — that is enough proof the URL + token
+  // are reachable.
+  try {
+    await pushEvents(cfg, []);
+    return {};
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (/HTTP 4\d\d/.test(msg) && /events|empty|array/i.test(msg)) return {};
+    throw err;
+  }
+}
+
+async function postPing(url: string, cfg: PushClientConfig): Promise<PingResult> {
   const start = Date.now();
   try {
-    const res = await axios.post<{ data: PingResult } | PingResult>(
+    const res = await axios.post<PingResult | { data: PingResult }>(
       url,
       { token: cfg.token },
       { timeout: cfg.timeoutMs ?? 10_000 },
     );
-    // BE wraps responses in { success, data, ... }; accept either shape.
+    // Some backends wrap responses as { success, data, ... }; accept either.
     const body = res.data as PingResult | { data: PingResult };
-    return 'data' in body && typeof body.data === 'object' ? body.data : (body as PingResult);
+    return 'data' in body && typeof body.data === 'object'
+      ? (body.data as PingResult)
+      : (body as PingResult);
   } catch (err) {
     if (err instanceof AxiosError) {
       const status = err.response?.status;
       const data = err.response?.data;
       const detail = typeof data === 'string' ? data : JSON.stringify(data ?? err.message);
       console.error(
-        `[chr-client] ✗ PING ${url} HTTP ${status ?? '???'} (${Date.now() - start}ms): ${detail}`,
+        `[api] ✗ PING ${url} HTTP ${status ?? '???'} (${Date.now() - start}ms): ${detail}`,
       );
-      throw new Error(
-        `Ping failed${status ? ` (HTTP ${status})` : ''}: ${detail}`,
-      );
+      throw new Error(`Ping failed${status ? ` (HTTP ${status})` : ''}: ${detail}`);
     }
     console.error(
-      `[chr-client] ✗ PING ${url} (${Date.now() - start}ms):`,
+      `[api] ✗ PING ${url} (${Date.now() - start}ms):`,
       err instanceof Error ? err.message : err,
     );
     throw err;

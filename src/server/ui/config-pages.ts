@@ -1,41 +1,57 @@
 import type { SharedConfigSlots } from '../../config/runtime';
 import { escapeHtml, renderLayout } from './layout';
 
-export function renderChrConfigPage(opts: {
+export function renderApiConfigPage(opts: {
   config: SharedConfigSlots;
   flash?: { kind: 'ok' | 'err'; message: string } | null;
 }): string {
   const { config } = opts;
   const body = `
     <div class="bg-white rounded-lg shadow p-6 max-w-2xl">
-      <h1 class="text-lg font-semibold mb-1">C-HR backend</h1>
+      <h1 class="text-lg font-semibold mb-1">Backend API</h1>
       <p class="text-sm text-slate-500 mb-4">
-        Shared API URL for all devices. Per-device IDs and tokens live on the
+        Where the bridge sends attendance events. Tokens live per-device on the
         <a class="underline" href="/devices">Devices</a> page.
       </p>
-      <form method="post" action="/config/chr" class="space-y-3">
+      <form method="post" action="/config/api" class="space-y-4">
         <label class="block">
-          <span class="text-sm font-medium">API base URL</span>
-          <input name="chrApiUrl" required value="${escapeHtml(config.chrApiUrl ?? '')}"
-            placeholder="https://api.your-c-hr.example.com/api/v1"
-            class="mt-1 block w-full border border-slate-300 rounded px-3 py-2 outline-none focus:ring-2 focus:ring-slate-500">
+          <span class="text-sm font-medium">Push URL <span class="text-rose-600">*</span></span>
+          <span class="block text-xs text-slate-500 mt-0.5">
+            Bridge POSTs <code class="bg-slate-100 px-1 rounded">{ token, events[] }</code> here.
+          </span>
+          <input name="pushUrl" required value="${escapeHtml(config.pushUrl ?? '')}"
+            placeholder="https://api.example.com/v1/attendance/push"
+            class="mt-1 block w-full border border-slate-300 rounded px-3 py-2 font-mono text-xs outline-none focus:ring-2 focus:ring-slate-500">
         </label>
+
+        <label class="block">
+          <span class="text-sm font-medium">Ping URL <span class="text-slate-400">(optional)</span></span>
+          <span class="block text-xs text-slate-500 mt-0.5">
+            Used by the <strong>Connect</strong> button to verify token + reachability without sending events.
+            Leave blank to fall back to a push with empty array.
+          </span>
+          <input name="pingUrl" value="${escapeHtml(config.pingUrl ?? '')}"
+            placeholder="https://api.example.com/v1/attendance/ping"
+            class="mt-1 block w-full border border-slate-300 rounded px-3 py-2 font-mono text-xs outline-none focus:ring-2 focus:ring-slate-500">
+        </label>
+
         <label class="block">
           <span class="text-sm font-medium">Poll interval (minutes)</span>
           <input name="pollIntervalMin" type="number" min="1" max="1440" required
             value="${escapeHtml(String(config.pollIntervalMin ?? 5))}"
             class="mt-1 block w-32 border border-slate-300 rounded px-3 py-2 outline-none focus:ring-2 focus:ring-slate-500">
         </label>
+
         <div class="pt-2">
           <button class="bg-slate-900 text-white px-4 py-2 rounded font-medium hover:bg-slate-800">Save</button>
         </div>
       </form>
     </div>`;
   return renderLayout({
-    title: 'C-HR config',
+    title: 'Backend API',
     body,
     showNav: true,
-    active: 'config-chr',
+    active: 'config-api',
     flash: opts.flash,
   });
 }
@@ -49,7 +65,7 @@ export function renderSystemConfigPage(opts: {
       <div class="bg-white rounded-lg shadow p-6">
         <h2 class="font-semibold mb-2">Auto-start on boot</h2>
         <p class="text-sm text-slate-500 mb-3">
-          Register ZK-Bridge as a service so it starts automatically when this machine reboots.
+          Run the bridge as a service so it starts automatically after a reboot.
           Requires admin privileges on the host.
         </p>
         <form method="post" action="/config/system/autostart" class="flex items-center gap-3">
@@ -63,7 +79,9 @@ export function renderSystemConfigPage(opts: {
 
       <div class="bg-white rounded-lg shadow p-6">
         <h2 class="font-semibold mb-2">Run a cycle now</h2>
-        <p class="text-sm text-slate-500 mb-3">Polls every enabled device once and pushes events. Useful for verification.</p>
+        <p class="text-sm text-slate-500 mb-3">
+          Polls every enabled device once and pushes events. Useful for verification.
+        </p>
         <form method="post" action="/api/cycle/run">
           <button class="bg-slate-900 text-white px-3 py-1.5 rounded text-sm font-medium hover:bg-slate-800">Run now</button>
         </form>

@@ -43,7 +43,7 @@ export interface DeviceView {
   name: string;
   host: string;
   port: number;
-  chrDeviceToken: string;
+  deviceToken: string;
   lastEventLogId: number;
   lastSyncAt: Date | null;
   lastStatus: DeviceLastStatus;
@@ -57,7 +57,7 @@ function toView(d: Device): DeviceView {
     name: d.name,
     host: d.host,
     port: d.port,
-    chrDeviceToken: d.chrDeviceToken,
+    deviceToken: d.deviceToken,
     lastEventLogId: d.lastEventLogId,
     lastSyncAt: d.lastSyncAt ?? null,
     lastStatus: d.lastStatus,
@@ -85,7 +85,7 @@ export interface DeviceInput {
   name: string;
   host: string;
   port: number;
-  chrDeviceToken: string;
+  deviceToken: string;
   enabled: boolean;
 }
 

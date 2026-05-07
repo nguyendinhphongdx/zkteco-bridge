@@ -52,7 +52,7 @@ function printHelp(): void {
 
 Fetch the most recent attendance records straight from a ZK device — useful
 for sanity-checking that a device is reachable, returning data, and that
-employee codes line up with what's in C-HR.
+employee codes match what's in your backend.
 
 Options:
   -d, --device <id|name>   Which device to query. Optional when only one
@@ -63,9 +63,9 @@ Options:
   -h, --help               Show this help.
 
 Examples:
-  pnpm --filter @c-hr/zk-bridge recent-events
-  pnpm --filter @c-hr/zk-bridge recent-events --device "Cửa chính"
-  pnpm --filter @c-hr/zk-bridge recent-events -n 50 --raw`);
+  zk-bridge recent-events
+  zk-bridge recent-events --device "Front gate"
+  zk-bridge recent-events -n 50 --raw`);
 }
 
 async function selectDevice(filter?: string): Promise<Device> {

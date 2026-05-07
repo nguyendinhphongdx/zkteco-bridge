@@ -20,14 +20,14 @@ export class Config extends Model<InferAttributes<Config>, InferCreationAttribut
   declare updatedAt: CreationOptional<Date>;
 }
 
-export type DeviceLastStatus = 'ok' | 'zk_error' | 'chr_error' | 'partial' | null;
+export type DeviceLastStatus = 'ok' | 'zk_error' | 'api_error' | 'partial' | null;
 
 export class Device extends Model<InferAttributes<Device>, InferCreationAttributes<Device>> {
   declare id: CreationOptional<number>;
   declare name: string;
   declare host: string;
   declare port: CreationOptional<number>;
-  declare chrDeviceToken: string;
+  declare deviceToken: string;
   declare lastEventLogId: CreationOptional<number>;
   declare lastSyncAt: CreationOptional<Date | null>;
   declare lastStatus: CreationOptional<DeviceLastStatus>;
@@ -49,7 +49,7 @@ export class EventQueue extends Model<
   declare lastError: CreationOptional<string | null>;
 }
 
-export type CycleStatus = 'ok' | 'zk_error' | 'chr_error' | 'partial';
+export type CycleStatus = 'ok' | 'zk_error' | 'api_error' | 'partial';
 
 export class CycleLog extends Model<
   InferAttributes<CycleLog>,
@@ -103,7 +103,7 @@ export function defineModels(sequelize: Sequelize): void {
       name: { type: DataTypes.STRING, allowNull: false },
       host: { type: DataTypes.STRING, allowNull: false },
       port: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 4370 },
-      chrDeviceToken: { type: DataTypes.TEXT, allowNull: false, field: 'chr_device_token' },
+      deviceToken: { type: DataTypes.TEXT, allowNull: false, field: 'device_token' },
       lastEventLogId: {
         type: DataTypes.INTEGER,
         allowNull: false,

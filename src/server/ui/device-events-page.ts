@@ -30,7 +30,7 @@ export function renderDeviceEventsPage(opts: {
     <tr class="bg-slate-100 border-y-2 border-slate-400">
       <td colspan="5" class="py-2 px-2 text-xs font-medium text-slate-700">
         ← Cursor at eventLogId = <span class="font-mono">${device.lastEventLogId}</span>
-        <span class="text-slate-500">— rows above = chưa push, rows below = đã push lên C-HR</span>
+        <span class="text-slate-500">— rows above = pending push, rows below = already pushed</span>
       </td>
     </tr>`;
 
@@ -124,7 +124,7 @@ export function renderDeviceEventsPage(opts: {
             Reload
           </a>
           <form method="post" action="/devices/${device.id}/reset-cursor" class="inline"
-                onsubmit="return confirm('Reset cursor về 0 cho ${escapeHtml(device.name)}?\\n\\nCycle tiếp theo sẽ re-pull TẤT CẢ event còn trên device. C-HR dedupe qua (deviceId, eventLogId) nên an toàn nhưng có thể push hàng nghìn record 1 lúc.')">
+                onsubmit="return confirm('Reset cursor for ${escapeHtml(device.name)}?\\n\\nThe next cycle will re-pull every event still on the device. The backend dedupes by (deviceId, eventLogId), so this is safe — but it can push thousands of records at once.')">
             <button class="text-xs px-3 py-1.5 border border-rose-300 text-rose-700 rounded hover:bg-rose-50">
               Reset cursor
             </button>

@@ -18,7 +18,7 @@ import {
   type DeviceInput,
 } from '../db/repo';
 import { User } from '../db/models';
-import { pingConnection } from '../poll/chr-client';
+import { pingConnection } from '../poll/api-client';
 import { translateZkRecord } from '../poll/translate';
 import { fetchAttendances } from '../poll/zk-client';
 import { restartScheduler, runOnce } from '../poll/scheduler';
@@ -33,7 +33,7 @@ import {
   unpackSession,
 } from './session';
 import { renderLoginPage, renderSetupPage } from './ui/auth-pages';
-import { renderChrConfigPage, renderSystemConfigPage } from './ui/config-pages';
+import { renderApiConfigPage, renderSystemConfigPage } from './ui/config-pages';
 import { renderDashboard } from './ui/dashboard-page';
 import { renderDeviceEventsPage, type DeviceEventRow } from './ui/device-events-page';
 import { renderDevicesPage } from './ui/devices-page';
@@ -64,15 +64,15 @@ function parseDeviceForm(form: Record<string, unknown>): DeviceInput | string {
   const name = String(form.name ?? '').trim();
   const host = String(form.host ?? '').trim();
   const port = Number(form.port);
-  const chrDeviceToken = String(form.chrDeviceToken ?? '').trim();
+  const deviceToken = String(form.deviceToken ?? '').trim();
   const enabled = form.enabled === '1' || form.enabled === 'on' || form.enabled === true;
 
   if (!name) return 'Name is required.';
   if (!host) return 'Device IP is required.';
   if (!Number.isFinite(port) || port < 1 || port > 65535) return 'Invalid port.';
-  if (!chrDeviceToken) return 'C-HR Device token is required.';
+  if (!deviceToken) return 'Device token is required.';
 
-  return { name, host, port, chrDeviceToken, enabled };
+  return { name, host, port, deviceToken, enabled };
 }
 
 let lastScanResults: ScanCandidate[] = [];
@@ -170,7 +170,7 @@ export function createServer(): Hono<SessionVars> {
     const recentCycles = await listCycleLogs({ limit: 20 });
     return c.html(
       renderDashboard({
-        apiUrlSet: Boolean(shared.chrApiUrl),
+        apiUrlSet: Boolean(shared.pushUrl),
         shared,
         devices,
         totalQueued,
@@ -188,7 +188,7 @@ export function createServer(): Hono<SessionVars> {
         devices,
         scanResults: lastScanResults,
         scanRan: lastScanRan,
-        apiUrlSet: Boolean(shared.chrApiUrl),
+        apiUrlSet: Boolean(shared.pushUrl),
       }),
     );
   });
@@ -204,7 +204,7 @@ export function createServer(): Hono<SessionVars> {
           devices,
           scanResults: lastScanResults,
           scanRan: lastScanRan,
-          apiUrlSet: Boolean(shared.chrApiUrl),
+          apiUrlSet: Boolean(shared.pushUrl),
           flash: { kind: 'err', message: parsed },
         }),
       );
@@ -228,7 +228,7 @@ export function createServer(): Hono<SessionVars> {
           devices,
           scanResults: [],
           scanRan: true,
-          apiUrlSet: Boolean(shared.chrApiUrl),
+          apiUrlSet: Boolean(shared.pushUrl),
           flash: { kind: 'err', message: `Scan failed: ${msg}` },
         }),
       );
@@ -249,7 +249,7 @@ export function createServer(): Hono<SessionVars> {
           devices,
           scanResults: lastScanResults,
           scanRan: lastScanRan,
-          apiUrlSet: Boolean(shared.chrApiUrl),
+          apiUrlSet: Boolean(shared.pushUrl),
           flash: { kind: 'err', message: parsed },
         }),
       );
@@ -366,13 +366,14 @@ export function createServer(): Hono<SessionVars> {
     const device = Number.isFinite(id) ? await getDevice(id) : null;
     const shared = await readSharedConfig();
     let flash: { kind: 'ok' | 'err'; message: string };
-    if (!device || !shared.chrApiUrl) {
-      flash = { kind: 'err', message: 'Device not found, or C-HR API URL is missing.' };
+    if (!device || !shared.pushUrl) {
+      flash = { kind: 'err', message: 'Device not found, or Push URL is not configured.' };
     } else {
       try {
         const result = await pingConnection({
-          baseUrl: shared.chrApiUrl,
-          token: device.chrDeviceToken,
+          pushUrl: shared.pushUrl,
+          pingUrl: shared.pingUrl,
+          token: device.deviceToken,
         });
         flash = {
           kind: 'ok',
@@ -389,46 +390,58 @@ export function createServer(): Hono<SessionVars> {
         devices,
         scanResults: lastScanResults,
         scanRan: lastScanRan,
-        apiUrlSet: Boolean(shared.chrApiUrl),
+        apiUrlSet: Boolean(shared.pushUrl),
         flash,
       }),
     );
   });
 
-  // ---------- /config/chr ----------
-  app.get('/config/chr', async (c) => {
+  // ---------- /config/api ----------
+  app.get('/config/api', async (c) => {
     const config = await readSharedConfig();
-    return c.html(renderChrConfigPage({ config }));
+    return c.html(renderApiConfigPage({ config }));
   });
 
-  app.post('/config/chr', async (c) => {
+  app.post('/config/api', async (c) => {
     const form = await c.req.parseBody();
     const interval = Number(form.pollIntervalMin);
+    const pushUrl = String(form.pushUrl ?? '').trim();
+    const pingUrl = String(form.pingUrl ?? '').trim();
+    if (!pushUrl) {
+      const config = await readSharedConfig();
+      return c.html(
+        renderApiConfigPage({
+          config,
+          flash: { kind: 'err', message: 'Push URL is required.' },
+        }),
+      );
+    }
     if (!Number.isFinite(interval) || interval < 1 || interval > 1440) {
       const config = await readSharedConfig();
       return c.html(
-        renderChrConfigPage({
+        renderApiConfigPage({
           config,
-          flash: { kind: 'err', message: 'Invalid poll interval (1–1440 min).' },
+          flash: { kind: 'err', message: 'Poll interval must be between 1 and 1440 minutes.' },
         }),
       );
     }
     await setConfigMany({
-      [ConfigKeys.ChrApiUrl]: String(form.chrApiUrl ?? '').trim(),
+      [ConfigKeys.PushUrl]: pushUrl,
+      [ConfigKeys.PingUrl]: pingUrl,
       [ConfigKeys.PollIntervalMin]: String(interval),
     });
     await restartScheduler();
     const config = await readSharedConfig();
     return c.html(
-      renderChrConfigPage({
+      renderApiConfigPage({
         config,
-        flash: {
-          kind: 'ok',
-          message: 'Saved. Scheduler restarted with the new interval.',
-        },
+        flash: { kind: 'ok', message: 'Saved. Scheduler restarted with the new interval.' },
       }),
     );
   });
+
+  // Legacy redirect for bookmarks pointing at /config/chr.
+  app.get('/config/chr', (c) => c.redirect('/config/api'));
 
   // ---------- /config/system ----------
   app.get('/config/system', async (c) => {

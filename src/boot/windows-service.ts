@@ -1,6 +1,6 @@
 import { resolveRunPaths, run, SERVICE_NAME } from './common';
 
-const TASK_NAME = `C-HR ${SERVICE_NAME}`;
+const TASK_NAME = `ZK-Bridge (${SERVICE_NAME})`;
 
 /**
  * Windows: register a Scheduled Task that runs the bridge at boot. This is
