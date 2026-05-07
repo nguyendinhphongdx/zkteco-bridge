@@ -59,10 +59,18 @@ zk-bridge start
 ```
 
 ```text
-[zk-bridge] data dir: ~/.local/share/zk-bridge
-[zk-bridge] UI listening on http://127.0.0.1:7000
-[scheduler] starting cron "*/5 * * * *" (every 5 min)
-[zk-bridge] running. Press Ctrl+C to stop.
+[zk-bridge] started (PID 12345)
+  Logs:  ~/.local/share/zk-bridge/zk-bridge.log
+  Stop:  zk-bridge stop
+  Tail:  zk-bridge logs -f
+```
+
+`start` detaches — closing the terminal won't stop the bridge. Useful one-liners:
+
+```bash
+zk-bridge status                 # is it running?
+zk-bridge logs -f                # follow the log
+zk-bridge stop                   # stop it
 ```
 
 ### 3. Open the admin UI
@@ -112,7 +120,13 @@ Visit **<http://localhost:7000>**, set the backend Push URL, paste the per-devic
 ## CLI
 
 ```bash
-zk-bridge start                  # Start bridge (UI + scheduler)
+zk-bridge start                  # Start as background daemon (writes PID + log)
+zk-bridge stop                   # Stop the daemon
+zk-bridge restart                # Stop + start
+zk-bridge status                 # PID, uptime, log path
+zk-bridge logs -f                # Follow the log
+zk-bridge logs -n 200            # Last 200 lines
+zk-bridge run                    # Run in the foreground (debug / systemd / Docker)
 zk-bridge poll-once              # Run a single cycle then exit
 zk-bridge reset-user             # Forgot-password recovery
 zk-bridge recent-events          # Print last N events from a device
@@ -120,6 +134,8 @@ zk-bridge upgrade [tag]          # Self-update via npm
 zk-bridge --help
 zk-bridge --version
 ```
+
+`start` detaches from the launching shell — `Ctrl+C` in that terminal does NOT kill the daemon. Use `zk-bridge stop`. Logs go to `<DATA_DIR>/zk-bridge.log`.
 
 Environment overrides (otherwise default):
 

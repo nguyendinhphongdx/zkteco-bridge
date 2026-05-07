@@ -12,6 +12,14 @@
 import { spawn } from 'node:child_process';
 import * as path from 'node:path';
 
+import {
+  formatUptime,
+  startDaemon,
+  statusDaemon,
+  stopDaemon,
+  tailLog,
+} from './daemon';
+
 const command = process.argv[2];
 
 function help(): void {
@@ -19,7 +27,12 @@ function help(): void {
   console.log(`Usage: zk-bridge <command> [options]
 
 Commands:
-  start                    Start bridge (UI + scheduler) — default if no command given
+  start                    Start bridge in the background (writes PID + log)
+  stop                     Stop the running daemon
+  restart                  Stop + start
+  status                   Show daemon state (PID, uptime, log path)
+  logs [-f] [-n N]         Print last N log lines (default 50). -f to follow.
+  run                      Run in the foreground (debug / systemd / Docker)
   poll-once                Run a single poll cycle then exit (no UI server)
   reset-user               Reset the local admin user (forgot password recovery)
   recent-events            Print recent events from a device
@@ -29,18 +42,18 @@ Commands:
   version, --version, -v   Show package version
 
 Environment:
-  DATA_DIR=./data          Where SQLite + admin credentials live
+  DATA_DIR                 Where SQLite + admin credentials + log live
+                           (default: OS user data dir)
   PORT=7000                UI HTTP port
   BIND_HOST=127.0.0.1      Bind address. Set 0.0.0.0 to allow LAN access
 
 Examples:
-  zk-bridge start
-  PORT=8080 zk-bridge start
-  zk-bridge poll-once
-  zk-bridge reset-user
-  zk-bridge upgrade
-  zk-bridge upgrade next
-  zk-bridge recent-events --device "Cửa chính" -n 30
+  zk-bridge start                    # daemonize
+  zk-bridge status                   # is it running?
+  zk-bridge logs -f                  # follow logs
+  zk-bridge stop                     # stop the daemon
+  PORT=8080 zk-bridge run            # foreground on a custom port
+  zk-bridge recent-events --device "Front gate" -n 30
 `);
 }
 
@@ -98,21 +111,104 @@ async function upgrade(tag = 'latest'): Promise<void> {
   // eslint-disable-next-line no-console
   console.log(
     `[zk-bridge] ✓ upgraded ${target}.\n` +
-      'Restart the running bridge process to pick up the new code:\n' +
-      '  systemd:        sudo systemctl restart zk-bridge\n' +
-      '  Windows Task:   schtasks /End /TN "ZK-Bridge (zk-bridge)" && schtasks /Run /TN "ZK-Bridge (zk-bridge)"\n' +
-      '  launchd:        launchctl kickstart -k gui/$UID/com.chr.zk-bridge\n' +
-      '  pm2:            pm2 restart zk-bridge\n' +
-      '  docker compose: docker compose pull && docker compose up -d\n' +
-      '  manual:         Ctrl+C the foreground process, then `zk-bridge start` again',
+      'Restart the daemon to pick up the new code:\n' +
+      '  zk-bridge restart',
+  );
+}
+
+function parseLogsArgs(): { follow: boolean; lines: number } {
+  const argv = process.argv.slice(3);
+  const follow = argv.includes('-f') || argv.includes('--follow');
+  const nIdx = argv.findIndex((a) => a === '-n' || a === '--lines');
+  const lines = nIdx >= 0 ? Number(argv[nIdx + 1]) : 50;
+  return { follow, lines: Number.isFinite(lines) && lines > 0 ? lines : 50 };
+}
+
+function cmdStart(): void {
+  try {
+    const r = startDaemon();
+    // eslint-disable-next-line no-console
+    console.log(
+      `[zk-bridge] started (PID ${r.pid})\n` +
+        `  Logs:  ${r.logPath}\n` +
+        `  Stop:  zk-bridge stop\n` +
+        `  Tail:  zk-bridge logs -f`,
+    );
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error(`[zk-bridge] ${err instanceof Error ? err.message : err}`);
+    process.exit(1);
+  }
+}
+
+function cmdStop(): void {
+  const r = stopDaemon();
+  if (!r) {
+    // eslint-disable-next-line no-console
+    console.log('[zk-bridge] not running.');
+    return;
+  }
+  // eslint-disable-next-line no-console
+  console.log(`[zk-bridge] stopped (PID ${r.pid}).`);
+}
+
+async function cmdRestart(): Promise<void> {
+  cmdStop();
+  await new Promise((r) => setTimeout(r, 600));
+  cmdStart();
+}
+
+function cmdStatus(): void {
+  const s = statusDaemon();
+  if (!s.running) {
+    // eslint-disable-next-line no-console
+    console.log(
+      `[zk-bridge] not running.\n` +
+        `  Data dir: ${s.dataDir}\n` +
+        `  Logs:     ${s.logPath} (last run, if any)`,
+    );
+    return;
+  }
+  const up = s.uptimeMs !== undefined ? formatUptime(s.uptimeMs) : 'unknown';
+  // eslint-disable-next-line no-console
+  console.log(
+    `[zk-bridge] running.\n` +
+      `  PID:      ${s.pid}\n` +
+      `  Uptime:   ${up}\n` +
+      `  Data dir: ${s.dataDir}\n` +
+      `  Logs:     ${s.logPath}`,
   );
 }
 
 async function main(): Promise<void> {
   switch (command) {
+    // ── daemon control ───────────────────────────────────────────────────
     case undefined:
     case 'start':
-      // Strip the subcommand so the underlying entry sees a clean argv.
+      cmdStart();
+      return;
+
+    case 'stop':
+      cmdStop();
+      return;
+
+    case 'restart':
+      await cmdRestart();
+      return;
+
+    case 'status':
+      cmdStatus();
+      return;
+
+    case 'logs': {
+      const { follow, lines } = parseLogsArgs();
+      tailLog(follow, lines);
+      return;
+    }
+
+    // ── foreground / one-shot ────────────────────────────────────────────
+    case 'run':
+      // Foreground mode — what daemons / Docker / systemd should call.
       process.argv.splice(2, 1);
       await import('../index');
       return;
@@ -132,12 +228,13 @@ async function main(): Promise<void> {
       await import('./recent-events');
       return;
 
+    // ── self-update ──────────────────────────────────────────────────────
     case 'upgrade':
     case 'update':
-      // Optional next arg = npm dist-tag (e.g. `next`). Default `latest`.
       await upgrade(process.argv[3] ?? 'latest');
       return;
 
+    // ── meta ─────────────────────────────────────────────────────────────
     case 'help':
     case '--help':
     case '-h':

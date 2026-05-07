@@ -32,6 +32,7 @@ npm install -g "${PKG}"
 # 3. First start (foreground). Open the URL in a browser to finish setup.
 PORT="${PORT:-7000}"
 BIND_HOST="${BIND_HOST:-127.0.0.1}"
-log "Starting bridge on http://${BIND_HOST}:${PORT} — Ctrl+C to stop."
-log "Toggle 'Auto-start on boot' in the UI to install the systemd unit."
+log "Starting bridge as a background daemon ..."
 PORT="${PORT}" BIND_HOST="${BIND_HOST}" zk-bridge start
+log "Open http://${BIND_HOST}:${PORT} in a browser to finish setup."
+log "Useful commands: zk-bridge status / zk-bridge logs -f / zk-bridge stop"

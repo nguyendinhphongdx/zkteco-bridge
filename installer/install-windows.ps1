@@ -28,6 +28,7 @@ $port = if ($env:PORT) { $env:PORT } else { '7000' }
 $bind = if ($env:BIND_HOST) { $env:BIND_HOST } else { '127.0.0.1' }
 $env:PORT = $port
 $env:BIND_HOST = $bind
-Log "Starting bridge on http://${bind}:${port} - Ctrl+C to stop."
-Log "Toggle 'Auto-start on boot' in the UI to register a Scheduled Task."
+Log "Starting bridge as a background daemon ..."
 zk-bridge start
+Log "Open http://${bind}:${port} in a browser to finish setup."
+Log "Useful commands: zk-bridge status / zk-bridge logs -f / zk-bridge stop"
