@@ -463,40 +463,62 @@ export class ZkClient {
     size: number,
   ): Promise<{ data: Buffer; err: string | null }> {
     let lastErr: string | null = null;
+    // Some ZK firmwares occasionally emit 2 PREPARE_DATA frames in a row
+    // before the actual CMD_DATA. Tolerate up to this many stray PREPARE /
+    // ACK frames per chunk instead of failing the attempt — the device is
+    // self-healing, just chatty.
+    const MAX_DRAIN = 4;
+
     for (let attempt = 0; attempt <= this.chunkRetries; attempt++) {
-      let wait1: Promise<Buffer> | null = null;
+      let pending: Promise<Buffer> | null = null;
       try {
-        wait1 = this.waitForPacket(this.chunkTimeoutMs);
+        pending = this.waitForPacket(this.chunkTimeoutMs);
         this.sendChunkRequest(start, size);
-        const pkt1 = await wait1;
-        wait1 = null;
-        const zk1 = stripTcpMagic(pkt1);
-        const cmd1 = zk1.readUInt16LE(0);
+        const firstPkt = await pending;
+        pending = null;
+        const firstCmd = stripTcpMagic(firstPkt).readUInt16LE(0);
 
-        if (cmd1 === CMD.DATA) {
-          return { data: zk1.subarray(8), err: null };
+        // Fast path — single frame.
+        if (firstCmd === CMD.DATA) {
+          return { data: stripTcpMagic(firstPkt).subarray(8), err: null };
         }
-        if (cmd1 !== CMD.PREPARE_DATA && cmd1 !== CMD.ACK_OK) {
-          throw new Error(`Unexpected cmd ${cmd1} for chunk ${index} (expected PREPARE_DATA)`);
+        if (firstCmd !== CMD.PREPARE_DATA && firstCmd !== CMD.ACK_OK) {
+          throw new Error(
+            `Unexpected cmd ${firstCmd} for chunk ${index} (expected PREPARE_DATA)`,
+          );
         }
 
-        // Wait for the actual CMD_DATA that follows PREPARE_DATA.
-        const pkt2 = await this.waitForPacket(this.chunkTimeoutMs);
-        const zk2 = stripTcpMagic(pkt2);
-        const cmd2 = zk2.readUInt16LE(0);
-        if (cmd2 !== CMD.DATA) {
-          throw new Error(`Expected CMD_DATA after PREPARE for chunk ${index}, got ${cmd2}`);
+        // Drain stray PREPARE_DATA / ACK frames until we see CMD_DATA.
+        let drained = 0;
+        for (;;) {
+          if (drained >= MAX_DRAIN) {
+            throw new Error(
+              `Too many non-DATA frames after PREPARE for chunk ${index} — giving up`,
+            );
+          }
+          const pkt = await this.waitForPacket(this.chunkTimeoutMs);
+          const zk = stripTcpMagic(pkt);
+          const cmd = zk.readUInt16LE(0);
+          if (cmd === CMD.DATA) {
+            return { data: zk.subarray(8), err: null };
+          }
+          if (cmd !== CMD.PREPARE_DATA && cmd !== CMD.ACK_OK) {
+            throw new Error(
+              `Expected CMD_DATA after PREPARE for chunk ${index}, got ${cmd}`,
+            );
+          }
+          // Quietly drain — firmware sent another PREPARE before the DATA.
+          drained++;
         }
-        return { data: zk2.subarray(8), err: null };
       } catch (err) {
         lastErr = err instanceof Error ? err.message : String(err);
         this.log(
           `[zk] chunk ${index + 1} attempt ${attempt + 1}/${this.chunkRetries + 1} failed: ${lastErr}`,
         );
-        // If sendChunkRequest threw before we could await wait1, the waiter's
+        // If sendChunkRequest threw before we could await pending, the waiter's
         // 60s timer is still armed. Cancel it + swallow the late rejection
         // so it doesn't surface as an unhandledRejection (process crash).
-        this.cancelOrphanWaiter(wait1);
+        this.cancelOrphanWaiter(pending);
       }
     }
     return { data: Buffer.alloc(0), err: lastErr ?? 'unknown chunk error' };
