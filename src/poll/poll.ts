@@ -158,15 +158,28 @@ async function runDeviceCycle(
 
   pulled = records.length;
   const usable = records.filter((r) => r.deviceUserId && r.deviceUserId !== '0');
+
+  // Auto-reset cursor when the device's max userSn is lower than the stored
+  // cursor — happens when the device log is cleared or the unit is replaced.
+  const maxUsableSn = usable.length > 0 ? Math.max(...usable.map((r) => Number(r.userSn))) : 0;
+  let effectiveCursor = device.lastEventLogId;
+  if (device.lastEventLogId > 0 && maxUsableSn < device.lastEventLogId) {
+    console.warn(
+      `[poll] "${device.name}" cursor reset: stored=${device.lastEventLogId} > maxSn=${maxUsableSn} — device log was cleared`,
+    );
+    effectiveCursor = 0;
+    await updateDeviceCursor(device.id, { lastEventLogId: 0 });
+  }
+
   // Cap newest LIMIT_RECENT (lib returns oldest-first, slice(-N) = newest),
   // then keep only events past the cursor. Server still dedups via unique
   // (deviceId, eventLogId) as a safety net for the rare double-send.
   const recent = usable.slice(-LIMIT_RECENT_RECORDS);
   const fresh = recent
-    .filter((r) => Number(r.userSn) > device.lastEventLogId)
+    .filter((r) => Number(r.userSn) > effectiveCursor)
     .map(translateZkRecord);
   console.log(
-    `[poll] "${device.name}" — ${usable.length} usable, ${recent.length} recent, ${fresh.length} fresh after cursor=${device.lastEventLogId}`,
+    `[poll] "${device.name}" — ${usable.length} usable, ${recent.length} recent, ${fresh.length} fresh after cursor=${effectiveCursor}`,
   );
 
   if (fresh.length === 0) {

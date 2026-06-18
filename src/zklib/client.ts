@@ -480,10 +480,17 @@ export class ZkClient {
           throw new Error(`Unexpected cmd ${cmd1} for chunk ${index} (expected PREPARE_DATA)`);
         }
 
-        // Wait for the actual CMD_DATA that follows PREPARE_DATA.
-        const pkt2 = await this.waitForPacket(this.chunkTimeoutMs);
-        const zk2 = stripTcpMagic(pkt2);
-        const cmd2 = zk2.readUInt16LE(0);
+        // Wait for CMD_DATA. Some ZKTeco firmware sends an extra PREPARE_DATA
+        // before the actual data packet (PREPARE → PREPARE → DATA). If we see
+        // a second PREPARE_DATA, skip it and read one more packet.
+        let pkt2 = await this.waitForPacket(this.chunkTimeoutMs);
+        let zk2 = stripTcpMagic(pkt2);
+        let cmd2 = zk2.readUInt16LE(0);
+        if (cmd2 === CMD.PREPARE_DATA || cmd2 === CMD.ACK_OK) {
+          pkt2 = await this.waitForPacket(this.chunkTimeoutMs);
+          zk2 = stripTcpMagic(pkt2);
+          cmd2 = zk2.readUInt16LE(0);
+        }
         if (cmd2 !== CMD.DATA) {
           throw new Error(`Expected CMD_DATA after PREPARE for chunk ${index}, got ${cmd2}`);
         }
