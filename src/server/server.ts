@@ -378,7 +378,7 @@ export function createServer(): Hono<SessionVars> {
         });
         flash = {
           kind: 'ok',
-          message: `${device.name}: connected. Backend lastSeenAt updated (deviceId=${result.deviceId}).`,
+          message: `${device.name}: backend reachable — token OK (deviceId=${result.deviceId}).`,
         };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);

@@ -94,10 +94,13 @@ function listIPv4Subnets(): Subnet[] {
     if (!list) continue;
     for (const a of list) {
       if (a.family !== 'IPv4' || a.internal) continue;
-      if (a.netmask !== '255.255.255.0') continue;
-      const parts = a.address.split('.');
-      if (parts.length !== 4) continue;
-      out.push({ prefix: `${parts[0]}.${parts[1]}.${parts[2]}.`, selfIp: a.address });
+      const addrParts = a.address.split('.');
+      const maskParts = a.netmask.split('.');
+      if (addrParts.length !== 4 || maskParts.length !== 4) continue;
+      // Always scan the /24 block containing this interface's IP.
+      // Works for any supernet (/16, /23, etc.) — we just limit the sweep to
+      // the nearest /24 so the scan stays under ~254 probes.
+      out.push({ prefix: `${addrParts[0]}.${addrParts[1]}.${addrParts[2]}.`, selfIp: a.address });
     }
   }
   return out;

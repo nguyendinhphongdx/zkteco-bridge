@@ -7,18 +7,36 @@ function formatDate(d: Date | null | undefined): string {
   return new Date(d).toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
 }
 
-function statusDot(status: string | null): string {
-  const map: Record<string, { color: string; label: string }> = {
-    ok: { color: 'bg-emerald-500', label: 'OK' },
-    partial: { color: 'bg-amber-500', label: 'Partial' },
-    api_error: { color: 'bg-rose-500', label: 'API error' },
-    zk_error: { color: 'bg-rose-500', label: 'Device error' },
-  };
-  const m = status ? map[status] : null;
-  if (!m) {
-    return `<span class="inline-flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-slate-300"></span><span class="text-xs text-slate-500">never run</span></span>`;
+function dot(color: string, label: string, title: string): string {
+  return `<span class="inline-flex items-center gap-1 whitespace-nowrap" title="${escapeHtml(title)}">
+    <span class="w-2 h-2 rounded-full ${color}"></span>
+    <span class="text-xs text-slate-600">${escapeHtml(label)}</span>
+  </span>`;
+}
+
+// Derive two independent status dots from a single lastStatus value.
+// ZK dot reflects whether the device was reachable last poll.
+// Backend dot reflects whether pushing to the API succeeded.
+function statusDots(status: string | null): string {
+  if (!status) {
+    const grey = dot('bg-slate-300', '—', 'Never polled');
+    return `<div class="flex flex-col gap-0.5">${grey}${grey}</div>`;
   }
-  return `<span class="inline-flex items-center gap-1.5"><span class="w-2 h-2 rounded-full ${m.color}"></span><span class="text-xs text-slate-700">${escapeHtml(m.label)}</span></span>`;
+  const zkDot =
+    status === 'zk_error'
+      ? dot('bg-rose-500', 'ZK error', 'Last poll: device unreachable')
+      : dot('bg-emerald-500', 'ZK ok', 'Last poll: device responded');
+
+  const backendDot =
+    status === 'ok'
+      ? dot('bg-emerald-500', 'Backend ok', 'Last poll: all events pushed')
+      : status === 'partial'
+        ? dot('bg-amber-500', 'Backend partial', 'Last poll: some events queued')
+        : status === 'api_error'
+          ? dot('bg-rose-500', 'Backend error', 'Last poll: push failed')
+          : dot('bg-slate-300', 'Backend —', 'Last poll: did not reach push step');
+
+  return `<div class="flex flex-col gap-0.5">${zkDot}${backendDot}</div>`;
 }
 
 function deviceRow(d: DeviceView): string {
@@ -29,7 +47,7 @@ function deviceRow(d: DeviceView): string {
         <div class="text-xs text-slate-500">id #${d.id}${d.enabled ? '' : ' · <span class="text-amber-700">disabled</span>'}</div>
       </td>
       <td class="py-2 pr-2 font-mono text-sm">${escapeHtml(d.host)}:${d.port}</td>
-      <td class="py-2 pr-2">${statusDot(d.lastStatus)}</td>
+      <td class="py-2 pr-2">${statusDots(d.lastStatus)}</td>
       <td class="py-2 pr-2 text-sm">${formatDate(d.lastSyncAt)}</td>
       <td class="py-2 pr-2 text-sm text-rose-700">${escapeHtml(d.lastError ?? '')}</td>
       <td class="py-2 pr-2 text-right whitespace-nowrap">
@@ -40,7 +58,7 @@ function deviceRow(d: DeviceView): string {
         <button type="button" class="zkb-edit text-xs px-2 py-1 border border-slate-300 rounded hover:bg-slate-100"
           data-device='${escapeHtml(JSON.stringify(d))}'>Edit</button>
         <form method="post" action="/devices/${d.id}/connect" class="inline">
-          <button class="text-xs px-2 py-1 border border-slate-300 rounded hover:bg-slate-100">Connect</button>
+          <button class="text-xs px-2 py-1 border border-slate-300 rounded hover:bg-slate-100" title="Send a ping to the C-HR backend to verify the device token">Ping backend</button>
         </form>
         <form method="post" action="/devices/${d.id}/delete" class="inline"
               onsubmit="return confirm('Delete ${escapeHtml(d.name)}?')">
@@ -139,7 +157,7 @@ export function renderDevicesPage(opts: {
           <tr class="text-left text-xs uppercase text-slate-500">
             <th class="pb-2 pr-2">Name</th>
             <th class="pb-2 pr-2">Host</th>
-            <th class="pb-2 pr-2">Status</th>
+            <th class="pb-2 pr-2" title="ZK device / Backend — result of the last poll cycle">Status</th>
             <th class="pb-2 pr-2">Last sync</th>
             <th class="pb-2 pr-2">Last error</th>
             <th class="pb-2 pr-2"></th>

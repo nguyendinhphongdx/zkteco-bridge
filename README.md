@@ -293,6 +293,24 @@ Every console line is prefixed with an ISO timestamp so logs from `pm2 logs` / `
 | Scheduler | [node-cron](https://github.com/node-cron/node-cron) |
 | Build | [TypeScript](https://www.typescriptlang.org/) |
 
+## Release (maintainers)
+
+```bash
+cd services/zk-bridge
+
+# 1. Bump version (updates package.json + creates a git tag)
+npm version patch   # or: minor | major | 0.1.8 (explicit)
+
+# 2. Build
+pnpm build
+
+# 3. Publish to npm
+npm publish --access public
+```
+
+> Requires `npm login` with an account that has publish access to `@hanoilab/zk-bridge`.
+> After publishing, push the version commit and tag: `git push && git push --tags`.
+
 ## License
 
 MIT &copy; [HanoiLab](mailto:opencode@hanoilab.vn)
