@@ -157,30 +157,28 @@ export function tailLog(follow: boolean, lines: number): void {
   if (!follow) return;
 
   let pos = fs.statSync(p.log).size;
-  const watcher = fs.watch(p.log, () => {
-    let stat;
+  // fs.watch is unreliable on Windows (misses events). Poll instead.
+  const timer = setInterval(() => {
     try {
-      stat = fs.statSync(p.log);
+      const stat = fs.statSync(p.log);
+      if (stat.size > pos) {
+        const fd = fs.openSync(p.log, 'r');
+        const buf = Buffer.alloc(stat.size - pos);
+        fs.readSync(fd, buf, 0, buf.length, pos);
+        fs.closeSync(fd);
+        process.stdout.write(buf.toString('utf8'));
+        pos = stat.size;
+      } else if (stat.size < pos) {
+        pos = 0;
+      }
     } catch {
-      return;
+      // log file temporarily missing — ignore
     }
-    if (stat.size > pos) {
-      const fd = fs.openSync(p.log, 'r');
-      const buf = Buffer.alloc(stat.size - pos);
-      fs.readSync(fd, buf, 0, buf.length, pos);
-      fs.closeSync(fd);
-      process.stdout.write(buf.toString('utf8'));
-      pos = stat.size;
-    } else if (stat.size < pos) {
-      pos = 0;
-    }
-  });
+  }, 500);
   process.on('SIGINT', () => {
-    watcher.close();
+    clearInterval(timer);
     process.exit(0);
   });
-  // Keep the event loop alive.
-  setInterval(() => undefined, 1 << 30);
 }
 
 function readLastLines(file: string, lines: number): string {
