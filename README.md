@@ -296,20 +296,14 @@ Every console line is prefixed with an ISO timestamp so logs from `pm2 logs` / `
 ## Release (maintainers)
 
 ```bash
-cd services/zk-bridge
-
-# 1. Bump version (updates package.json + creates a git tag)
+# Bump version in package.json + create a git tag
 npm version patch   # or: minor | major | 0.1.8 (explicit)
 
-# 2. Build
-pnpm build
-
-# 3. Publish to npm
-npm publish --access public
+# Push commit + tag — CI does the rest (build → pack → publish)
+git push && git push --tags
 ```
 
-> Requires `npm login` with an account that has publish access to `@hanoilab/zk-bridge`.
-> After publishing, push the version commit and tag: `git push && git push --tags`.
+The [publish workflow](.github/workflows/publish.yml) triggers on any `v*` tag push and automatically installs, builds, and publishes to npm using the `NPM_TOKEN` secret.
 
 ## License
 
