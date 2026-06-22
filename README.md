@@ -214,6 +214,63 @@ Used by the **Connect** button to verify the JWT + URL without sending events. I
 
 See [c-hr backend](https://github.com/nguyendinhphongdx/c-hr) — `apps/backend/src/apps/attendance/attendance-device/` is a NestJS module that implements the contract end-to-end, including JWT version revocation and orphan-event reconcile.
 
+## Server Requirements
+
+ZK-Bridge must run on a machine **inside the same LAN as the ZKTeco device** — cloud VMs cannot reach `192.168.x.x:4370` directly. WiFi is fine as long as the router does not have AP isolation enabled.
+
+| | Minimum | Comfortable |
+|---|---|---|
+| CPU | 1 core | 2 core |
+| RAM | 128 MB | 512 MB |
+| Disk | 500 MB | 4 GB |
+| OS | Windows 10 / Ubuntu 20.04 / macOS 12 | Ubuntu 22.04 LTS |
+| Node.js | 20 LTS | 22 LTS |
+| Network | LAN + outbound HTTPS (443) | Wired preferred |
+
+**What won't work:**
+- Cloud VMs (AWS, GCP, etc.) — no LAN route to the ZKTeco device.
+- Router with AP isolation enabled — blocks WiFi-to-wired communication.
+
+## Deploy on Ubuntu
+
+```bash
+# 1. Install Node.js 22
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt install -y nodejs
+
+# 2. Install zk-bridge
+sudo npm i -g @hanoilab/zk-bridge
+
+# 3. Start
+zk-bridge start
+```
+
+Open **http://localhost:7000** to configure the backend Push URL and add devices.
+
+**Auto-start on reboot** — toggle *System → Auto-start on boot* in the UI (registers a systemd unit automatically). To manage manually:
+
+```bash
+sudo systemctl status zk-bridge
+sudo systemctl restart zk-bridge
+journalctl -u zk-bridge -f
+```
+
+**Firewall** — if `ufw` is active:
+
+```bash
+sudo ufw allow 7000/tcp        # admin UI (inbound)
+sudo ufw allow out 443/tcp     # push events to C-HR backend (outbound HTTPS)
+sudo ufw allow out 4370/tcp    # poll ZKTeco device (outbound TCP)
+```
+
+**Remote access to UI** — by default the UI binds to `127.0.0.1` (localhost only). To access from another machine on the LAN:
+
+```bash
+BIND_HOST=0.0.0.0 zk-bridge start
+```
+
+Data is stored at `~/.local/share/zk-bridge/` (SQLite + logs). Override with `DATA_DIR=/var/lib/zk-bridge`.
+
 ## Self-Hosting
 
 ```bash
@@ -230,6 +287,11 @@ Or install your local checkout as the global CLI:
 npm install -g .
 zk-bridge start
 ```
+
+**Typical setups:**
+- **Office Windows PC** — install globally, toggle auto-start in the UI System page (registers a Windows Scheduled Task).
+- **Ubuntu server / Raspberry Pi** — install globally, auto-start via systemd toggle in UI.
+- **Office NAS / home server** — run via Docker (`docker compose up -d`), bind-mount `./data` for SQLite persistence.
 
 ### Auto-start (production)
 

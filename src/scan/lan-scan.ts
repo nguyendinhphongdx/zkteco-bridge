@@ -94,13 +94,17 @@ function listIPv4Subnets(): Subnet[] {
     if (!list) continue;
     for (const a of list) {
       if (a.family !== 'IPv4' || a.internal) continue;
-      const addrParts = a.address.split('.');
-      const maskParts = a.netmask.split('.');
-      if (addrParts.length !== 4 || maskParts.length !== 4) continue;
-      // Always scan the /24 block containing this interface's IP.
-      // Works for any supernet (/16, /23, etc.) — we just limit the sweep to
-      // the nearest /24 so the scan stays under ~254 probes.
-      out.push({ prefix: `${addrParts[0]}.${addrParts[1]}.${addrParts[2]}.`, selfIp: a.address });
+      const addr = a.address.split('.').map(Number);
+      const mask = a.netmask.split('.').map(Number);
+      if (addr.length !== 4 || mask.length !== 4) continue;
+      // Calculate network and broadcast addresses, then enumerate every /24
+      // block within the subnet. Handles /22, /23, /16, etc. correctly —
+      // a /22 yields 4 blocks, a /24 yields 1.
+      const net = addr.map((b, i) => b & mask[i]);
+      const bcast = addr.map((b, i) => b | (~mask[i] & 0xff));
+      for (let third = net[2]; third <= bcast[2]; third++) {
+        out.push({ prefix: `${net[0]}.${net[1]}.${third}.`, selfIp: a.address });
+      }
     }
   }
   return out;
