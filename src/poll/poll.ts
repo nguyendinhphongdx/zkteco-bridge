@@ -18,10 +18,9 @@ import { translateZkRecord } from './translate';
 import type { AttendanceEvent } from './types';
 import { fetchAttendances } from './zk-client';
 
-// Cap số record gửi mỗi cycle. Bridge không filter cursor — pull bao
-// nhiêu lib trả, take last N (newest), push hết. Backend dedup qua unique
-// (deviceId, eventLogId) → push trùng = no-op an toàn. Self-healing khi
-// cursor lệch / device reset / partial read.
+// Cap số record gửi mỗi cycle. Bridge pulls the full device log, then sends
+// the next window after the cursor. This lets reset/initial sync backfill
+// large devices over multiple cycles instead of jumping the cursor to newest.
 const LIMIT_RECENT_RECORDS = 2000;
 
 export interface DeviceCycleResult {
@@ -171,15 +170,14 @@ async function runDeviceCycle(
     await updateDeviceCursor(device.id, { lastEventLogId: 0 });
   }
 
-  // Cap newest LIMIT_RECENT (lib returns oldest-first, slice(-N) = newest),
-  // then keep only events past the cursor. Server still dedups via unique
-  // (deviceId, eventLogId) as a safety net for the rare double-send.
-  const recent = usable.slice(-LIMIT_RECENT_RECORDS);
-  const fresh = recent
-    .filter((r) => Number(r.userSn) > effectiveCursor)
+  // Lib returns oldest-first. Take the next LIMIT_RECENT records after the
+  // cursor, not the newest LIMIT_RECENT, so large backfills advance steadily.
+  const pending = usable.filter((r) => Number(r.userSn) > effectiveCursor);
+  const fresh = pending
+    .slice(0, LIMIT_RECENT_RECORDS)
     .map(translateZkRecord);
   console.log(
-    `[poll] "${device.name}" — ${usable.length} usable, ${recent.length} recent, ${fresh.length} fresh after cursor=${effectiveCursor}`,
+    `[poll] "${device.name}" — ${usable.length} usable, ${pending.length} pending, ${fresh.length} fresh after cursor=${effectiveCursor}`,
   );
 
   if (fresh.length === 0) {
