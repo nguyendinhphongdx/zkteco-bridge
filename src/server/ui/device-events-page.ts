@@ -1,5 +1,5 @@
 import type { DeviceView } from '../../db/repo';
-import { escapeHtml, renderLayout } from './layout';
+import { escapeHtml, formatTs, renderLayout } from './layout';
 
 export interface DeviceEventRow {
   eventLogId: string;
@@ -8,10 +8,6 @@ export interface DeviceEventRow {
   type: 'IN' | 'OUT';
   /** True if this event's userSn is > device.lastEventLogId (not yet pushed). */
   pending: boolean;
-}
-
-function formatTs(iso: string): string {
-  return new Date(iso).toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
 }
 
 export function renderDeviceEventsPage(opts: {
@@ -77,7 +73,7 @@ export function renderDeviceEventsPage(opts: {
   const prevPage = opts.page > 1 ? opts.page - 1 : null;
   const nextPage = opts.page < totalPages ? opts.page + 1 : null;
   const cachedLabel = opts.cachedAt
-    ? `Cached at ${new Date(opts.cachedAt).toISOString().replace('T', ' ').slice(0, 19)} UTC (${opts.fetchMs}ms)`
+    ? `Cached at ${formatTs(opts.cachedAt)} (${opts.fetchMs}ms)`
     : `Fetched in ${opts.fetchMs}ms`;
 
   const body = `

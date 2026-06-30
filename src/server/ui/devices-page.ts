@@ -1,10 +1,10 @@
 import type { ScanCandidate } from '../../scan/lan-scan';
 import type { DeviceView } from '../../db/repo';
-import { escapeHtml, renderLayout } from './layout';
+import { escapeHtml, formatTs, renderLayout } from './layout';
 
 function formatDate(d: Date | null | undefined): string {
   if (!d) return 'never';
-  return new Date(d).toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
+  return formatTs(d);
 }
 
 function dot(color: string, label: string, title: string): string {

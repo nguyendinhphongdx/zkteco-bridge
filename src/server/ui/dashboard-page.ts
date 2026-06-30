@@ -1,6 +1,6 @@
 import type { SharedConfigSlots } from '../../config/runtime';
 import type { CycleLogView, DeviceView } from '../../db/repo';
-import { escapeHtml, renderLayout } from './layout';
+import { escapeHtml, formatTs, renderLayout } from './layout';
 
 export interface DashboardData {
   apiUrlSet: boolean;
@@ -13,7 +13,7 @@ export interface DashboardData {
 
 function formatDate(d: Date | null | undefined): string {
   if (!d) return '—';
-  return new Date(d).toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
+  return formatTs(d);
 }
 
 function statusBadge(status: string | null): string {

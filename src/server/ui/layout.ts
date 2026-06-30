@@ -16,6 +16,30 @@ export interface LayoutOptions {
 export const GITHUB_URL = 'https://github.com/nguyendinhphongdx/zkteco-bridge';
 export const NPM_URL = 'https://www.npmjs.com/package/@hanoilab/zk-bridge';
 
+/** IANA timezone of the host running the bridge — shown next to local times. */
+const LOCAL_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+/**
+ * Format an instant as "YYYY-MM-DD HH:MM:SS <tz>" in the host's local
+ * timezone (not UTC), so operators read the same wall-clock the device shows.
+ */
+export function formatTs(d: Date | string | number | null | undefined): string {
+  if (d === null || d === undefined || d === '') return '';
+  const date = d instanceof Date ? d : new Date(d);
+  if (Number.isNaN(date.getTime())) return '';
+  const s = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: LOCAL_TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).format(date);
+  return `${s} ${LOCAL_TZ}`;
+}
+
 export function escapeHtml(value: string | number | undefined | null): string {
   if (value === undefined || value === null) return '';
   return String(value)
