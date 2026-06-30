@@ -119,15 +119,20 @@ export function renderDeviceEventsPage(opts: {
              class="text-xs px-3 py-1.5 border border-slate-300 rounded hover:bg-slate-100">
             Reload
           </a>
-          <form method="post" action="/devices/${device.id}/reset-cursor" class="flex items-center gap-1.5"
-                onsubmit="return confirm('Reset cursor for ${escapeHtml(device.name)} to eventLogId = ' + this.cursor.value + '?\\n\\nThe next cycle re-pulls every event with userSn > that value. The backend dedupes by (deviceId, eventLogId), so this is safe — but it can push many records at once.')">
-            <input type="number" name="cursor" value="0" min="0" max="${opts.totalRecords}" step="1"
-                   title="Set cursor to this eventLogId. 0 = re-push everything; pick a number below max to re-push only events after it."
-                   class="text-xs w-24 px-2 py-1.5 border border-slate-300 rounded font-mono" />
-            <button class="text-xs px-3 py-1.5 border border-rose-300 text-rose-700 rounded hover:bg-rose-50">
+          <details class="relative">
+            <summary class="list-none [&::-webkit-details-marker]:hidden cursor-pointer text-xs px-3 py-1.5 border border-rose-300 text-rose-700 rounded hover:bg-rose-50 select-none">
               Reset cursor
-            </button>
-          </form>
+            </summary>
+            <form method="post" action="/devices/${device.id}/reset-cursor"
+                  class="absolute right-0 mt-1 z-10 flex items-center gap-1.5 bg-white border border-slate-200 rounded shadow-lg p-2 whitespace-nowrap">
+              <input type="number" name="cursor" value="0" min="0" max="${opts.totalRecords}" step="1" autofocus
+                     title="Set cursor to this eventLogId. 0 = re-push everything; pick a number below max to re-push only events after it."
+                     class="text-xs w-24 px-2 py-1.5 border border-slate-300 rounded font-mono" />
+              <button class="text-xs px-3 py-1.5 bg-rose-600 text-white rounded hover:bg-rose-700">
+                Xác nhận
+              </button>
+            </form>
+          </details>
         </div>
       </div>
       <table class="w-full">
