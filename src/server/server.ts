@@ -267,7 +267,10 @@ export function createServer(): Hono<SessionVars> {
 
   app.post('/devices/:id/reset-cursor', async (c) => {
     const id = Number(c.req.param('id'));
-    if (Number.isFinite(id)) await resetDeviceCursor(id);
+    const form = await c.req.parseBody();
+    const raw = Number(form.cursor);
+    const cursor = Number.isFinite(raw) && raw >= 0 ? Math.floor(raw) : 0;
+    if (Number.isFinite(id)) await resetDeviceCursor(id, cursor);
     return c.redirect(`/devices/${id}/events`);
   });
 

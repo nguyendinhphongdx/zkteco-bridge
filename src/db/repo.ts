@@ -123,9 +123,14 @@ export async function updateDeviceCursor(
   await Device.update(update, { where: { id } });
 }
 
-export async function resetDeviceCursor(id: number): Promise<void> {
+/**
+ * Set the device cursor to an arbitrary event id (default 0). The next cycle
+ * re-pulls every event with userSn > `lastEventLogId`. Pass a value below the
+ * device's max userSn to re-push only events after that point.
+ */
+export async function resetDeviceCursor(id: number, lastEventLogId = 0): Promise<void> {
   await Device.update(
-    { lastEventLogId: 0, lastSyncAt: null, updatedAt: new Date() },
+    { lastEventLogId, lastSyncAt: null, updatedAt: new Date() },
     { where: { id } },
   );
 }

@@ -127,7 +127,7 @@ ZKTeco device          ZK-Bridge (this UI)         Your backend
         </p>
         <ul class="list-disc pl-5 space-y-1 text-sm text-slate-700">
           <li><strong>Refresh from device</strong> — re-fetch (typical 5–30s for thousands of records).</li>
-          <li><strong>Reset cursor</strong> — sets <code class="bg-slate-100 px-1 rounded">last_event_log_id = 0</code>; next cycle re-pulls every event still on the device. Backend dedupes — safe but may push thousands at once.</li>
+          <li><strong>Reset cursor</strong> — sets <code class="bg-slate-100 px-1 rounded">last_event_log_id</code> to the value you enter (default <code class="bg-slate-100 px-1 rounded">0</code>); next cycle re-pulls every event with <code class="bg-slate-100 px-1 rounded">userSn</code> greater than it. Use <code class="bg-slate-100 px-1 rounded">0</code> to re-push everything, or a number below max to re-push only events after that point. Backend dedupes — safe but may push many at once.</li>
           <li>Pagination: 50 rows per page, deep-link friendly via <code class="bg-slate-100 px-1 rounded">?page=N</code>.</li>
         </ul>
       </section>
